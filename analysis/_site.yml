@@ -9,8 +9,6 @@ navbar:
     href: about.html
   - text: License
     href: license.html
-  - text: Index
-    href: index.html
   right:
   - icon: fab fa-github
     text: Source code
@@ -19,5 +17,5 @@ output:
   workflowr::wflow_html:
     toc: yes
     toc_float: yes
-    theme: cosmo
+    theme: flatly
     highlight: textmate
