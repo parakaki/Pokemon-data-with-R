@@ -12,7 +12,7 @@ navbar:
   right:
   - icon: fab fa-github
     text: Source code
-    href: https://github.com/parakaki/Pokemon Data with R
+    href: https://github.com/parakaki/Pokemon-data-with-R
 output:
   workflowr::wflow_html:
     toc: yes
