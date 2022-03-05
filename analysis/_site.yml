@@ -3,8 +3,10 @@ output_dir: ../docs
 navbar:
   title: Pokemon Data with R
   left:
-  - text: Home
+  - text: Landing Page
     href: index.html
+  - text: Data Exploration
+    href: Pokemon_EDA.html
   - text: About
     href: about.html
   - text: License
