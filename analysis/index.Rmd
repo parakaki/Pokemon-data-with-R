@@ -8,4 +8,4 @@ editor_options:
   chunk_output_type: console
 ---
 
-Pokemon data exploration (check it out [here](Pokemon_EDA.html).)
+View the Pokemon data exploration [here](Pokemon_EDA.html).
