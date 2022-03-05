@@ -1,5 +1,3 @@
 # Pokemon Data with R
 
-A [workflowr][] project.
-
-[workflowr]: https://github.com/workflowr/workflowr
+A simple exploration of Pokemon base stat and move data.
