@@ -1,0 +1,1999 @@
+---
+title: "Pokemon Data Explored"
+author: "parakaki"
+date: "3/5/2022"
+output:
+  html_document:
+    number_sections: true
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: flatly
+    highlight: tango
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, fig.align = "center")
+```
+
+# Introduction
+
+Pocket Monsters, or Pokémon or Pokemon, is a video game series developed by Game Freak and published by Nintendo and The Pokemon Company. Since the release of Pokemon Red and Pokemon Green in Japan on 27 February 1996, the franchise has expanded greatly, incorporating a trading card game, multiple animated and *manga* series, and many varieties of merchandise. The series is readying the ninth generation of creatures, which will be introduced in late 2022.
+
+In this project, we will focus on the games, specifically the Pokemon themselves and their moves. This will come in three major parts. The first two parts are simple data explorations: we will look into basic questions regarding stats and moves for a better glimpse into the world of Pokemon. The third part provides a number of additional questions that we can answer using the data.
+
+The data in this project are scraped from notable Pokemon websites [Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_by_base_stats_(Generation_VIII-present)) and [The Pokemon Database](pokemondb.net). To perform the data analysis, we will make use of the Tidyverse packages.
+
+```{r tidyverse}
+library(tidyverse)
+```
+
+# The Pokemon
+
+Each Pokemon has up to two types, up to three abilities, and six stats. For this exploration, we will focus on the stats. These are: 
+
+* HP: hit points, or the Pokemon's health. When this quantity falls to zero, the Pokemon faints and is unable to participate in battle.
+
+* Attack (Atk): a primary factor in how much damage the Pokemon deals when using a physical attack.
+
+* Defense (Def): a primary factor in how much damage the Pokemon receives when hit by a physical attack.
+
+* Special Attack (SpA): a primary factor in how much damage the Pokemon deals when using a special attack.
+
+* Special Defense (SpD): a primary factor in how much damage the Pokemon receives when hit by a special attack.
+
+* Speed (Spe): used to determine turn order.
+
+With this many stats that have different effects in battle, we would like to have a simple metric that determines how "good" a Pokemon is in battle: this is *base stat total*, or BST, which is simply the sum of a Pokemon's six base stats. In general, the higher the BST, the "better" the Pokemon is. This does not take into acount abilities or moves, but is useful as a quick eye test.
+
+For instance, let us consider the Magikarp line, introduced in Generation (Gen) I. Magikarp is perhaps one of the more well-known Pokemon, mostly because it is weak. In the same order as listed above, Magikarp's base stats are:
+
+> ![](images/129F.png){width=20%} 20 / 10 / 55 / 15 / 20 / 80 | 200
+
+We can see that Magikarp has higher Defense (55) than Special Defense (20), that its highest stat is Speed (80), and that its attacking prowess cannot be very good, based on its 10 and 15 Attack and Special Attack, respectively. One the whole, Magikarp's stat line is not impressive, and its 200 BST is very low across all Pokemon.
+
+Magikarp need not fear though: it evolves into Gyarados, another well-known Pokemon. However, while Magikarp is known for weakness, Gyarados is known for its strength (and how different it is from Magikarp). Let us examine Gyarados' stat line: 
+
+> ![](images/130F.png){width=20%} 95 / 125 / 79 / 60 / 100 / 81 | 540
+
+Beyond just looking more menacing, each of its stats has increased, with Attack growing the most (+115) and Speed the least (+1). Gyarados' BST of 540 is now quite respectable.
+
+In Gen VI, Mega Evolutions came to be, which is an in-battle form specific to 48 Pokemon. When Mega-Evolved, a Pokemon's stats (barring HP) are increased such that BST grows by exactly 100. Gyarados is one such Pokemon with a Mega Evolution.
+
+> ![](images/130M.png){width=20%} 95 / 155 / 109 / 70 / 130 / 81 | 640
+
+Mega Gyarados has even more Attack, a bit more bulk, and no additional Speed, making it hit harder but not any earlier or later than it normally would.
+
+## The Data
+
+Our goal with these Pokemon stats is to group Pokemon by type and generation to look for any trends or surprises. Let's load the data.
+
+```{r data}
+Pokemon <- read_csv("data/Pokemon_list.csv")
+
+Pokemon <- Pokemon %>% 
+  filter(Name != "Eternatus-Eternamax") %>% 
+  filter(Name != "Floette-Eternal")
+```
+
+Eternatus-Eternamax and Floette-Eternal are both coded into the games but have never been made available; thus, they have been removed from our analysis.
+
+<p>
+  <a class="btn btn-primary" 
+  data-toggle="collapse" 
+  href="#removedmons" 
+  role="button" 
+  aria-expanded="false"
+  aria-controls="removedmons">
+    Details on Eternatus and Floette
+  </a>
+</p>
+<div class="collapse" id="removedmons">
+  <div class="card card-body">
+    
+Both of these Pokemon serve as parts of the games' stories. Eternatus-Eternamax is the "final boss" of Pokemon Sword and Pokemon Shield, and is intended to be particularly bulky. Let's take a look at its stats compared to regular Eternatus, which is available in-game.
+
+> ![Eternatus](images/HOME890.png){width=20%} 140 / 85 / 95 / 145 / 95 / 130 | 690
+
+Regular Eternatus is known as the Gigantic Pokemon, and is the largest known Pokemon as of this writing, sitting at 20 meters (65'07") and 950 kilograms (2094.4 lbs.). It has a good amount of bulk due to its high HP and good defenses, and also has high Special Attack and Speed. Paired with its strong offensive Dragon/Poison typing, Eternatus is a force to be reckoned with.
+
+Now, let's take a look at its Eternamax form.
+
+> ![Eternatus-Eternamax](images/HOME890E.png){width=20%} 255 / 115 / 250 / 125 / 250 / 130 | 1125
+
+This form is even larger (100 meters, 328'01"), so large that it does not have a listed weight. This is a characteristic shared with other Dynamax Pokemon. From a stats perspective, Eternatus-Eternamax is the only Pokemon with a four-digit BST, and either ties or outright sets the record for highest HP, Defense, and Special Defense. Considering that Mega Mewtwo is the next highest overall in terms of BST (780, 345 below Eternatus-Eternamax) and that Arceus is the next highest among Pokemon available in Gen VIII (720, 405 below), it is no surprise that Eternatus-Eternamax is not available in-game beyond its one appearance as a final boss.
+
+Now for Floette-Eternal. This form of Floette played a fairly small role in Pokemon X and Pokemon Y, being the partner Pokemon of the mysterious character AZ. Let's consider Floette and Floette-Eternal, stat-wise.
+
+> ![Floette](images/HOME670.png){width=120} 54 / 45 / 47 / 75 / 98 / 52 | 371
+
+> ![Floette-Eternal](images/670-Eternal.png) 74 / 65 / 67 / 125 / 128 / 92 | 551
+
+Floette evolves from Flabébé and into Florges, so its stats are expected to be middling. By contrast, Floette-Eternal has much higher stats than a middle evolution stage would likely have (in fact, only 1 point less than Florges). Floette-Eternal is also the only Pokemon to learn the move Light of Ruin, which has also not been released. Considering Pokemon X and Pokemon Y were released in 2013 and Floette-Eternal still remains unreleased, it is unlikely that it will ever become available.
+    
+  </div>
+</div>
+
+
+
+```{r prelims, include=FALSE}
+`%!in%` = Negate(`%in%`)
+
+# The types list
+types <- list(
+  "Bug", "Dark", "Dragon", "Electric", "Fairy", "Fighting",
+  "Fire", "Flying", "Ghost", "Grass", "Ground", "Ice", 
+  "Normal", "Poison", "Psychic", "Rock", "Steel", "Water"
+)
+
+type_colors <- c(
+  "Bug" = "#8cc639", 
+  "Dark" = "#5b5365", 
+  "Dragon" = "#3864c1", 
+  "Electric" = "#edd847", 
+  "Fairy" = "#ec88e4", 
+  "Fighting" = "#ca406b", 
+  "Fire" = "#f8a159", 
+  "Flying" = "#96a5dd", 
+  "Ghost" = "#5c63ac", 
+  "Grass" = "#61c05e", 
+  "Ground" = "#d37b48", 
+  "Ice" = "#79cec0", 
+  "Normal" = "#9299a2", 
+  "Poison" = "#ad62c6", 
+  "Psychic" = "#f5727a", 
+  "Rock" = "#c2b98e", 
+  "Steel" = "#618ca1", 
+  "Water" = "#618ad4"
+)
+```
+
+We'll append generation values for future analysis. Rather than just tacking on numbers, we'll attach strings for better clarity.
+
+```{r gen values}
+Pokemon <- Pokemon %>% 
+  mutate(
+    Generation = 
+      case_when(
+        ID >= 810 ~ "VIII: Galar and Hisui",
+        ID >= 722 ~ "VII: Alola",
+        ID >= 650 ~ "VI: Kalos",
+        ID >= 494 ~ "V: Unova",
+        ID >= 387 ~ "IV: Sinnoh",
+        ID >= 252 ~ "III: Hoenn",
+        ID >= 152 ~ "II: Johto",
+        TRUE ~ "I: Kanto"
+      )
+  )
+```
+
+```{r Mega and regional sorting, include=FALSE}
+pk_mega <- grep("-Mega", Pokemon$Name, value = TRUE)
+pk_primal <- grep("-Primal", Pokemon$Name, value = TRUE)
+pk_ultra <- grep("-Ultra", Pokemon$Name, value = TRUE)
+pk_alola <- grep("-Alola", Pokemon$Name, value = TRUE)
+pk_galar <- grep("-Galar", Pokemon$Name, value = TRUE)
+pk_hisui <- grep("-Hisui", Pokemon$Name, value = TRUE)
+
+Pokemon <- Pokemon %>% 
+  mutate(
+    Regional = 
+      case_when(
+        Name %in% pk_alola ~ "Alola",
+        Name %in% pk_galar ~ "Galar", 
+        Name %in% pk_hisui ~ "Hisui", 
+        TRUE ~ "None"
+      ), 
+    Mega = 
+      case_when(
+        Name %in% pk_mega ~ TRUE, 
+        Name %in% pk_primal ~ TRUE, 
+        Name %in% pk_ultra ~ TRUE,
+        TRUE ~ FALSE
+      )
+  )
+rm(pk_mega, pk_alola, pk_galar, pk_hisui, pk_primal, pk_ultra)
+
+Pokemon <- Pokemon %>% 
+  mutate(
+    Monotype = 
+      case_when(
+        is.na(Type2) == TRUE ~ TRUE, 
+        TRUE ~ FALSE
+      )
+  )
+```
+
+## Measures of Spread
+
+Before doing any grouping, let's get an idea of the data by way of some summary statistics. This will give us a better understanding of what BST is considered "good" versus "bad." We will also be able to back up our claims about Magikarp and Gyarados.
+
+These stats are performed on the collection of all Pokemon (except for the already-removed Eternatus-Eternamax and Floette-Eternal).
+
+```{r PKMN summary 1}
+x <- Pokemon %>% 
+  summarize(
+    HP = round(mean(HP), 1), 
+    Atk = round(mean(Atk), 1), 
+    Def = round(mean(Def), 1), 
+    SpA = round(mean(SpA), 1), 
+    SpD = round(mean(SpD), 1), 
+    Spe = round(mean(Spe), 1), 
+    BST = round(mean(BST), 1)
+  ) %>% 
+  mutate(Summary = "Average") %>% 
+  select(Summary, HP:BST)
+y <- Pokemon %>% 
+  summarize(
+    HP = round(sd(HP), 1), 
+    Atk = round(sd(Atk), 1),  
+    Def = round(sd(Def), 1),  
+    SpA = round(sd(SpA), 1),  
+    SpD = round(sd(SpD), 1),  
+    Spe = round(sd(Spe), 1),  
+    BST = round(sd(BST), 1)
+  ) %>% 
+  mutate(Summary = "SD") %>% 
+  select(Summary, HP:BST)
+
+PKMN_stats = list("HP", "Atk", "Def", "SpA", "SpD", "Spe", "BST")
+
+PKMN_summary_2 <- list()
+for (i in 1:7) {
+  PKMN_summary_2[[i]] <- as_tibble(as.list(quantile(Pokemon[[i+9]]))) %>% 
+    mutate(
+      Stat = PKMN_stats[[i]]
+    ) %>% 
+    select(Stat, `0%`:`100%`)
+}
+PKMN_summary_2 <- bind_rows(PKMN_summary_2)
+
+PKMN_summary_3 <- data.table::transpose(PKMN_summary_2) %>% 
+  add_column(
+    Summary = c("remove", "0%", "25%", "Median", "75%", "100%"), 
+    .before = "V1"
+  ) %>% 
+  select(
+    Summary, 
+    HP = V1, 
+    Atk = V2, 
+    Def = V3, 
+    SpA = V4, 
+    SpD = V5, 
+    Spe = V6, 
+    BST = V7
+  ) %>% 
+  tail(n = 5)
+PKMN_summary <- rbind(x, y, PKMN_summary_3)
+rm(x, y, PKMN_summary_2, PKMN_summary_3)
+
+PKMN_summary
+```
+
+Some observations:
+
+* All six stats have larger averages than medians. This suggests that all six are positively skewed (skewed right).
+
+* BST has a larger median than average. This suggests BST is negatively skewed (skewed left), despite all its constituent parts being positively skewed.
+
+* HP has both the highest high, owned by Blissey. HP also has the lowest low, with Shedinja's HP the only instance of any base stat equal to 1.
+
+* Attack has the lowest high, belonging to Mega Mewtwo X; Special Attack is the second-lowest high, this one belonging to Mega Mewtwo Y. Considering these two stats play large parts in determining how much damage moves do, it comes as no surprise from a balance perspective that they are the lowest highs.
+
+* Special Defense is the highest low. Many Pokemon, including both Caterpie and Deoxys-Attack, tie for this value.
+
+* By its definition, BST has the largest range (605). The lowest is Wishiwash, while the highest is a three-way tie between Mega Mewtwo X, Mega Mewtwo Y, and Mega Rayquaza.
+
+Thinking of Magikarp, all of its stats aside from Speed are below average, with HP, Attack, Special Attack, and Special Defense all more than one standard deviation below.
+
+On the other hand, all of Gyarados' stats aside from Special Attack are above average, with Attack and Special Defense more than one standard deviation above. And Mega Gyarados' stats are even more improved; in particular, its Attack is now two standard deviations above the average.
+
+We can test a pair of our skew hypotheses by way of histograms. We'll try Attack and BST.
+
+```{r Atk histogram}
+ggplot(Pokemon, aes(Atk)) + 
+  geom_histogram(binwidth = 5) + 
+  labs(
+    title = "Attack, All Pokemon", 
+    caption = "Binwidth = 5"
+  )
+```
+
+Attack across all Pokemon is slightly skewed right, as expected.
+
+```{r BST histogram}
+ggplot(Pokemon, aes(BST)) + 
+  geom_histogram(binwidth = 5) + 
+  labs(
+    title = "BST, All Pokemon", 
+    caption = "Binwidth = 5"
+  )
+```
+
+BST is all over the place, but is vaguely skewed left. The bin including 600 is the tallest, with many legendary and pseudo-legendary Pokemon fitting this criterion.
+
+## Types
+
+Before diving into the data, we give a quick rundown of the types in Pokemon.
+
+In battle, types interact with each other by way of both Pokemon and moves. If we choose a damaging attack against a target, one of four things can happen: 
+
+* The target is immune to the move.
+
+* The target resists the move. This can either halve or quarter the damage received.
+
+* The target takes neutral damage.
+
+* The target is weak to the move. This can either double or quadruple the damage received.
+
+Let us consider an example. We send out the following Arcanine:
+
+> ![](images/HOME059.png){width=20%}
+> 
+> * Flare Blitz | Fire
+>
+> * Close Combat | Fighting
+>
+> * Play Rough | Fairy
+>
+> * Extreme Speed | Normal
+
+Our opponent is an Aggron.
+
+> ![](images/HOME306.png){width=20%}
+>
+> Steel / Rock
+
+We can use any of Arcanine's moves. However, one move is preferred over the rest. Let us consider each case.
+
+* Fire is super-effective (×2) against Steel but not very effective against Rock (×0.5). Thus, these two balance out and Flare Blitz is normally effective against Aggron.
+
+* Fighting is super-effective against both Steel and Rock. These combine for a ×4 multiplier, meaning Close Combat is our best bet against Aggron.
+
+* Steel resists Fairy (×0.5), while Fairy hits Rock for neutral damage. Thus, Aggron resists Play Rough, so we would likely not choose it.
+
+* Both Steel and Rock resist Normal. Thus, Extreme Speed is hit by a ×0.25 multiplier, making it the weakest choice here.
+
+We will look at move types in the next chapter.
+
+When first starting out, a type chart is very handy to have. Newer games display move effectiveness in the battle interface, which helps us out.
+
+Gen I introduced fifteen types, including one very overpowered Psychic-type legendary (Mewtwo). Due to this centralization, Gen II introduced a pair of types to combat Psychic: Steel resists Psychic, and Dark is completely immune.
+
+This was the state of the type game through Gen V; at this point, it had become increasingly obvious that Dragon was now the overpowered typing, due to such Pokemon as Dragonite, Salamence, Latios, Rayquaza, Giratina, and Hydreigon. At the same time, Steel and Poison featured an immense lack of offensive capability: Steel was only super-effective against Ice and Rock (both already covered by Fighting), and Poison only against Grass (covered by Bug, Fire, Flying, and Ice). To balance all these things, Gen VI introduced the Fairy type, which is immune to Dragon and is weak to Steel and Poison. For further balance, Steel had two of its resistances (to Ghost and Dark) removed, bringing it from twelve resistances to ten. This is the current state of the game.
+
+![](images/types.png)
+
+Every Pokemon has one or two types. This leads us to the data. 
+
+### Type Counts
+
+A natural question at this point: which type is the most common? To answer this, we need to take into account that Pokemon can have two types. In particular, the order matters: Dragon / Flying (e.g. Rayquaza) is counted differently than Flying / Dragon (e.g. Noivern). From an `R` perspective, we must also take care of the column `Type2`, which takes the value `NA` if a Pokemon has only one type.
+
+```{r type counts}
+Pokemon_by_type <- list()
+for (i in 1:18) {
+  x <- types[[i]]
+  Pokemon_by_type[[i]] <- Pokemon %>% 
+    filter(Type1 == x | Type2 == x)
+}
+rm(i, x)
+
+# Pokemon counts by type
+Pokemon_type_counts <- list()
+for (i in 1:18) {
+  Pokemon_type_counts[[i]] <- Pokemon_by_type[[i]] %>% 
+    summarize(Count = n()) %>% 
+    mutate(Type = types[[i]]) %>% 
+    select(Type, Count)
+}
+Pokemon_type_counts <- bind_rows(Pokemon_type_counts)
+```
+
+From this, we can determine the most- and least-common types. We'll find the top and bottom three.
+
+```{r type max/min}
+Pokemon_type_counts %>% 
+  arrange(desc(Count)) %>% 
+  slice(1:3,16:18)
+```
+
+Perhaps unsurprisingly, given the Pokemon world's alignment with the real world, Water is the most common type. Each generation has a regional Normal-type and Flying-type (separately), the latter of which is always three evolutionary stages, so their high rankings can also be anticipated.
+
+On the other end, Ghost and Fairy are on the "fantasy" side of typings, so lower numbers seem reasonable. However, we might be surprised to find that Ice is the rarest typing.
+
+### Summary Statistics
+
+At earlier points in the game, Psychic and Dragon were at the top of the heap. Concerning Pokemon stats, does this hold up?
+
+```{r stats per type}
+avg_stats_per_type <- list()
+for (i in 1:18) {
+  avg_stats_per_type[[i]] <- Pokemon_by_type[[i]] %>% 
+    summarize(
+      HP_avg = mean(HP),
+      Atk_avg = mean(Atk),
+      Def_avg = mean(Def),
+      SpA_avg = mean(SpA),
+      SpD_avg = mean(SpD),
+      Spe_avg = mean(Spe),
+      BST_avg = mean(BST)
+    ) %>% 
+    mutate(Type = types[[i]]) %>% 
+    select(Type, HP_avg:BST_avg)
+}
+avg_stats_per_type <- bind_rows(avg_stats_per_type)
+```
+
+Let's find the top and bottom three types by BST average.
+
+```{r stats per type best/worst}
+avg_stats_per_type %>% 
+  arrange(desc(BST_avg)) %>% 
+  slice(1:3,16:18)
+```
+
+Even with the advent of the Fairy type, Dragon remains at the top. Psychic remains strong as well, checking in at third. But how "at the top" is Dragon? Let us plot these average BST values in descending order for a better idea.
+
+```{r stats per type plot}
+ggplot(
+  avg_stats_per_type, 
+  aes(reorder(Type, -BST_avg), BST_avg, fill = Type)
+) + 
+  geom_bar(stat = "identity") + 
+  scale_fill_manual(
+    values = c(
+      "Bug" = "#8cc639", 
+      "Dark" = "#5b5365", 
+      "Dragon" = "#3864c1", 
+      "Electric" = "#edd847", 
+      "Fairy" = "#ec88e4", 
+      "Fighting" = "#ca406b", 
+      "Fire" = "#f8a159", 
+      "Flying" = "#96a5dd", 
+      "Ghost" = "#5c63ac", 
+      "Grass" = "#61c05e", 
+      "Ground" = "#d37b48", 
+      "Ice" = "#79cec0", 
+      "Normal" = "#9299a2", 
+      "Poison" = "#ad62c6", 
+      "Psychic" = "#f5727a", 
+      "Rock" = "#c2b98e", 
+      "Steel" = "#618ca1", 
+      "Water" = "#618ad4"
+    )
+  ) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "none"
+  ) + 
+  labs(
+    title = "Average BST per Type",
+    x = "Type",
+    y = "Average BST"
+  )
+```
+
+The gap between Dragon and Steel is noticeably larger than that between Steel and Psychic.
+
+Why this sort of distribution? Legendary Pokemon have a tendency to be Dragon, Steel, and/or Psychic, which boosts those types' BST averages. Some examples include the aforementioned Mewtwo (which also has two Mega Evolutions), Lugia, Deoxys (which has a total of four forms), Dialga, Kyurem (three total forms), Zygarde (three total forms), Necrozma (four total forms), Zacian, and Zamazenta.
+
+On the other hand, Normal and Bug types tend to be found near the beginning of each game, and those Pokemon tend to be both common and weak. These include Caterpie, Weedle, Wurmple, Patrat, Scatterbug, Yungoos, and Skwovet.
+
+### Max and Min BST per Type
+
+Given how Mega Evolution affects BST, we anticipate lots of Mega Evolutions to appear in this computation. Let's take a look. Note that there may be ties per maximum or minimum value, but we ask for only one representative each in those cases.
+
+```{r max/min BST per type}
+temp1 <- list()
+for (i in 1:18) {
+  temp1[[i]] <- Pokemon_by_type[[i]] %>% 
+    mutate(
+      Stat_range = max(Pokemon_by_type[[i]][["BST"]]) - 
+                   min(Pokemon_by_type[[i]][["BST"]])
+    ) %>% 
+    slice_max(BST, with_ties = FALSE) %>% 
+    mutate(
+      Typing = types[[i]]
+    ) %>% 
+    select(
+      ID, Name, Typing, Stat_range, Type1:Generation
+    )
+}
+temp1 <- bind_rows(temp1)
+temp2 <- list()
+for (i in 1:18) {
+  temp2[[i]] <- Pokemon_by_type[[i]] %>% 
+    mutate(
+      Stat_range = max(Pokemon_by_type[[i]][["BST"]]) - 
+                   min(Pokemon_by_type[[i]][["BST"]])
+    ) %>% 
+    slice_min(BST, with_ties = FALSE) %>% 
+    mutate(
+      Typing = types[[i]]
+    ) %>% 
+    select(
+      ID, Name, Typing, Stat_range, Type1:Generation
+    )
+}
+temp2 <- bind_rows(temp2)
+maxmin_by_type <- rbind(temp1, temp2)
+rm(temp1, temp2)
+```
+
+<p>
+  <a class="btn btn-primary" 
+  data-toggle="collapse" 
+  href="#maxminBST1" 
+  role="button" 
+  aria-expanded="false"
+  aria-controls="maxminBST1">
+    Max/min BST by type
+  </a>
+</p>
+<div class="collapse" id="maxminBST1">
+  <div class="card card-body">
+
+```{r max/min BST per type 2}
+maxmin_by_type %>% 
+  select(Name, Typing, Generation, Type1, Type2, BST) %>% 
+  arrange(Typing) %>% 
+  print(n = nrow(maxmin_by_type))
+```
+
+  </div>
+</div>
+
+Just as expected, there are lots of Mega Evolutions in the list. However, in Gen VIII, Mega Evolutions (and Primal Reversions and Ultra Necrozma) were made unavailable. Let us remove these and try again.
+
+```{r max/min BST per type no Megas}
+Pokemon_by_type_no_megas <- list() 
+for (i in 1:18) {
+  x <- types[[i]]
+  Pokemon_by_type_no_megas[[i]] <- Pokemon %>% 
+    filter(Mega == FALSE) %>% 
+    filter(Type1 == x | Type2 == x)
+}
+rm(i, x)
+
+temp1 <- list()
+for (i in 1:18) {
+  temp1[[i]] <- Pokemon_by_type_no_megas[[i]] %>% 
+    mutate(
+      Stat_range = max(Pokemon_by_type_no_megas[[i]][["BST"]]) - 
+                   min(Pokemon_by_type_no_megas[[i]][["BST"]])
+    ) %>% 
+    slice_max(BST, with_ties = FALSE) %>% 
+    mutate(
+      Typing = types[[i]], 
+      max_min = "max"
+    ) %>% 
+    select(
+      ID, Name, Typing, Stat_range, Type1:Generation, max_min
+    )
+}
+temp1 <- bind_rows(temp1)
+temp2 <- list()
+for (i in 1:18) {
+  temp2[[i]] <- Pokemon_by_type_no_megas[[i]] %>% 
+    mutate(
+      Stat_range = max(Pokemon_by_type_no_megas[[i]][["BST"]]) - 
+                   min(Pokemon_by_type_no_megas[[i]][["BST"]])
+    ) %>% 
+    slice_min(BST, with_ties = FALSE) %>% 
+    mutate(
+      Typing = types[[i]], 
+      max_min = "min"
+    ) %>% 
+    select(
+      ID, Name, Typing, Stat_range, Type1:Generation, max_min
+    )
+}
+temp2 <- bind_rows(temp2)
+maxmin_by_type_no_megas <- rbind(temp1, temp2)
+rm(temp1, temp2)
+```
+
+<p>
+  <a class="btn btn-primary" 
+  data-toggle="collapse" 
+  href="#maxminBST2" 
+  role="button" 
+  aria-expanded="false"
+  aria-controls="maxminBST2">
+    Max/min BST by type, no Megas
+  </a>
+</p>
+<div class="collapse" id="maxminBST2">
+  <div class="card card-body">
+
+```{r max/min BST per type no megas 2}
+maxmin_by_type_no_megas %>% 
+  select(Name, Typing, Generation, Type1, Type2, BST) %>% 
+  arrange(Typing) %>% 
+  print(n = nrow(maxmin_by_type_no_megas))
+```
+
+  </div>
+</div>
+
+We can also visualize these data.
+
+```{r max/min BST no megas visual}
+maxmin_by_type_no_megas %>% 
+  arrange(max_min, desc(BST)) %>% 
+  mutate(
+    Typing = factor(Typing, levels = unique(Typing))
+  ) %>% 
+  ggplot() + 
+  aes(
+    Typing, BST, color = max_min, fill = Typing
+  ) + 
+  geom_col(position = "dodge") + 
+  scale_fill_manual(
+    values = c(
+      "Bug" = "#8cc639", 
+      "Dark" = "#5b5365", 
+      "Dragon" = "#3864c1", 
+      "Electric" = "#edd847", 
+      "Fairy" = "#ec88e4", 
+      "Fighting" = "#ca406b", 
+      "Fire" = "#f8a159", 
+      "Flying" = "#96a5dd", 
+      "Ghost" = "#5c63ac", 
+      "Grass" = "#61c05e", 
+      "Ground" = "#d37b48", 
+      "Ice" = "#79cec0", 
+      "Normal" = "#9299a2", 
+      "Poison" = "#ad62c6", 
+      "Psychic" = "#f5727a", 
+      "Rock" = "#c2b98e", 
+      "Steel" = "#618ca1", 
+      "Water" = "#618ad4"
+    )
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "none"
+  ) + 
+  labs(
+    title = "Max and Min BST per Type",
+    x = "Type",
+    y = "Max/Min BST"
+  )
+```
+
+The top four types are Fairy (Zacian), Fighting (Zamazenta), Normal (Arceus), and Steel (Zacian and Zamazenta), all with BST 720. Dragon and Ground (both Zygarde-Complete) are right behind at 708, and Ice (Kyurem-Black and Kyurem-White) rounds out the 700+ max BST types.
+
+On the other hand, Bug, Grass, and Rock look a bit neglected on the far right; their maximum BST values are 600. There have not yet been any box-art legendaries of these types; box-art legendaries tend to have around 680 BST.
+
+We can also look at the range of BST (max minus min value) per type, still without Megas.
+
+```{r BST ranges per type}
+maxmin_by_type_no_megas %>% 
+  filter(max_min == "max") %>% 
+  ggplot() + 
+  aes(reorder(Typing, -Stat_range), Stat_range, fill = Typing) + 
+  geom_bar(stat = "identity") + 
+  scale_fill_manual(
+    values = c(
+      "Bug" = "#8cc639", 
+      "Dark" = "#5b5365", 
+      "Dragon" = "#3864c1", 
+      "Electric" = "#edd847", 
+      "Fairy" = "#ec88e4", 
+      "Fighting" = "#ca406b", 
+      "Fire" = "#f8a159", 
+      "Flying" = "#96a5dd", 
+      "Ghost" = "#5c63ac", 
+      "Grass" = "#61c05e", 
+      "Ground" = "#d37b48", 
+      "Ice" = "#79cec0", 
+      "Normal" = "#9299a2", 
+      "Poison" = "#ad62c6", 
+      "Psychic" = "#f5727a", 
+      "Rock" = "#c2b98e", 
+      "Steel" = "#618ca1", 
+      "Water" = "#618ad4"
+    )
+  ) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "none"
+  ) + 
+  labs(
+    title = "BST Range per Type",
+    x = "Type",
+    y = "BST Range"
+  )
+```
+
+## Generations
+
+As of this writing, Pokemon is preparing its ninth generation with Pokemon Scarlet and Pokemon Violet due in late 2022. Beyond just the type additions mentioned earlier, much has happened between Gen I and Gen VIII. 
+
+### Counts
+
+The first question with regards to generations is quite natural: how many Pokemon were introduced per generation? Let's find out. 
+
+```{r gen counts, include=FALSE}
+PKMN_by_gen <- Pokemon %>% 
+  distinct(ID, .keep_all = TRUE) %>% 
+  group_by(Generation) %>% 
+  summarize(count = n())
+```
+
+```{r gen counts display}
+PKMN_by_gen
+```
+
+Gen V is the largest, surpassing even the first generation. And then the very next generation is the smallest. However, Gen VI also introduced all forty-eight (fifty if counting Primal Reversions) Mega Evolutions, so we could interpret Gen VI as containing as many as 122 Pokemon.
+
+In a similar way, Gens VII and VIII introduced regional variants.
+
+```{r regional counts}
+Pokemon %>% 
+  filter(Regional != "None") %>% 
+  group_by(Regional) %>% 
+  summarize(count = n())
+```
+
+Thus, Gen VII (Alola) has 106 Pokemon with these regional variants, and Gen VIII (both Galar and Hisui) has 132 Pokemon.
+
+### Power Creep
+
+From a gaming standpoint, power creep is fairly common: as time goes on, more powerful characters or items are introduced, leaving older characters/items in the dust. There are three mechanics that suggest power creep in Pokemon:
+
+* Gen VI introduced Mega Evolutions, a once-per-battle form change that affords a 100 BST boost to forty-eight Pokemon. Primal Reversions were also introduced, which are similar to Mega Evolutions and affect Kyogre and Groudon specifically.
+
+* Gen VII introduced Z-moves, a once-per-battle powered-up move that either increase power or add different (beneficial) effects. This also added Ultra Necrozma, a form somewhat similar to a Mega Evolution except with a BST boost of 74.
+
+* Gen VIII introduced Dynamax, a once-per-battle three-turn supersizing that doubles HP and yields Z-move-like Max Moves.
+
+Since we are currently concerned with Pokemon stats, we'll focus on Mega Evolutions and similar form changes (primal reversions and Ultra Necrozma). The question to be answered: do Pokemon stats display power creep? We'll use boxplots to help us determine an answer, in particular those provided by `ggplot2`. We note here that boxplot outliers are those points that are at least 1.5 times higher or lower than the upper or lowe quartiles, respectively.
+
+Let us first look at all Pokemon.
+
+```{r powercreep boxplot 1}
+ggplot(Pokemon, aes(Generation, BST)) + 
+  geom_boxplot() + 
+  labs(
+    x = "Generation", 
+    title = "BST by Generation"
+  )
+```
+
+The single outlier in Gen I is Mega Mewtwo X/Y, both having 780 BST. On the whole, there is a jump between Gen III and Gen IV, where the median remains high through Gen VIII.
+
+We've lumped together Mega Evolutions, Primal Reversions, and Ultra Necrozma for a total of 51 Pokemon whose BST can be boosted. Ultra Necrozma is specific to Gen VII; what about the other forms?
+
+```{r where are the megas}
+Pokemon %>% 
+  filter(Mega == TRUE) %>% 
+  group_by(Generation) %>% 
+  summarize(count = n())
+```
+
+The majority of these forms (43 of 51, 84%) affected Pokemon in Gens I through III. Thus, if we remove all such forms, the BST median jump between Gen III and Gen IV should be even more noticeable.
+
+```{r powercreep boxplot 2}
+colors <- c("With Megas" = "#c00000", "Without Megas" = "#0000c0")
+ggplot(Pokemon, aes(Generation, BST, color = "With Megas")) + 
+  geom_boxplot(
+    width = 0.25, 
+    position = position_nudge(x = -0.125)
+  ) + 
+  geom_boxplot(
+    data = filter(Pokemon, Mega == FALSE), 
+    aes(Generation, BST, color = "Without Megas"), 
+    width = 0.25, 
+    position = position_nudge(x = 0.125)
+  ) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "none"
+  ) + 
+  labs(
+    x = "Generation", 
+    title = "BST by Generation", 
+    color = "Legend"
+  ) + 
+  scale_color_manual(values = colors)
+```
+
+As expected, the boxplots are shifted downward when Mega Evolutions are removed. All totaled, Mega Evolutions offered an in-battle balancing of older generations compared to the (on the whole) higher-stat newer generations.
+
+---
+
+# The Moves
+
+As far as battling goes, the Pokemon themselves are of course important; without them, there are no battles. But just as important are the moves these Pokemon use; otherwise, battles wouldn't have turns or victors. In this chapter, we will explore the expansive world of Pokemon moves.
+
+Moves have types just like Pokemon, and almost all moves have exactly one type (the exception is Flying Press, coded as Fighting but dealing Flying damage as well). This makes analysis somewhat simpler. We will also streamline our work by setting aside the additional effects of these moves. For instance, consider the move Flamethrower:
+
+> Flamethrower | Fire | Special | Power: 90 | Accuracy: 100 | PP: 15 | 10% chance to burn the target
+
+We are interested in Flamethrower's type, category, power, accuracy, and PP (and other quantities), but not the burn chance. In Gen I, move effects were fairly simple, but have since become much more complex. Our goal here is to do some large-scale data exploration rather than exploring what new effects moves could have.
+
+## The Data
+
+Let's load the data.
+
+```{r move data}
+moves_all <- read_csv("data/Pokemon_moves.csv")
+```
+
+Descriptions of the data columns can be found in the expandable menu below.
+
+<p>
+  <a class="btn btn-primary" 
+  data-toggle="collapse" 
+  href="#movedetails" 
+  role="button" 
+  aria-expanded="false"
+  aria-controls="movedetails">
+    Move Data Details
+  </a>
+</p>
+<div class="collapse" id="movedetails">
+  <div class="card card-body">
+
+* ID: the move's game-data identification number.
+
+* Name: the move's name.
+
+* Type: the move's type. As previously mentioned, Flying Press is listed as Fighting, but deals Fighting and Flying damage simultaneously.
+  
+* Category: exactly one value of physical, special, or status. Physical and special moves deal damage, while status moves have varying effects, such as boosting/lowering stats or afflicting conditions like paralysis or poison.
+
+* PP: power points, or the number of times a move can be used.
+
+* Power: the move's strength, a positive integer value. By definition, status moves always have power 0.
+
+* Accuracy: the move's likelihood of hitting. A move accuracy of 100 means the move will not miss under normal circumstances, but can miss if the target's evasion is boosted, for instance.. A move accuracy of 101 means the move will not miss even with accuracy/evasion changes.
+
+* SwSh: whether the move is available in Pokemon Sword and Pokemon Shield (SwSh). Non-available moves cannot be used in these games under any circumstances.
+
+* BDSP: whether the move is available in Pokemon Brilliant Diamond and Pokemon Shining Pearl (BDSP).
+
+* LA: whether the move is available in Pokemon Legends: Arceus.
+
+* Contact: whether the move makes direct contact.
+
+* Target: which target(s) a move can affect.
+
+* TMs: Technical Machines, or items that teach Pokemon moves. These are numbered 00 to 99 in SwSh and between 1 and 100 in BDSP.
+
+* TRs: Technical Records, another type of item that taches moves. These are numbered 00 to 99 in SwSh and are not available in BDSP.
+
+* Priority: levels that supercede Speed when determining turn order. Higher values go first, lower values go last. In the event that two moves match in priority, Speed is used to determine which move goes first.
+
+* Multihit: the maximum number of times the move hits in the same turn.
+
+* Charge: whether the move requires a turn of charging before attacking.
+
+* Recharge: whether the move requires a turn of recharging after attacking.
+
+* Binding: whether the move binds and traps the target.
+
+* Sound, Powder: categorizations of moves.
+
+* Recoil: the percentage of damage dealt that is then dealt to the user.
+
+* Gen: the generation in which the move was introduced.
+  
+  </div>
+</div>
+
+There are a few types of moves that will be removed from consideration. These are the one-hit KO (OHKO) moves, Z-moves, and max moves.
+
+<p>
+  <a class="btn btn-primary" 
+  data-toggle="collapse" 
+  href="#OHKOdetails" 
+  role="button" 
+  aria-expanded="false"
+  aria-controls="OHKOdetails">
+    OHKO Moves
+  </a>
+</p>
+<div class="collapse" id="OHKOdetails">
+  <div class="card card-body">
+
+There are four OHKO moves, which are listed at 5000 power in the data. This is technically inaccurate, as the game lists them as having -- power. We wish to exclude the OHKO moves from our analysis; they are damaging moves with -- power, and they bypass the usual damage formula.
+
+  </div>
+</div>
+
+<p>
+  <a class="btn btn-primary" 
+  data-toggle="collapse" 
+  href="#zmovedetails" 
+  role="button" 
+  aria-expanded="false"
+  aria-controls="zmovedetails">
+    Z-Moves and Max Moves
+  </a>
+</p>
+<div class="collapse" id="zmovedetails">
+  <div class="card card-body">
+
+Gen VII introduced Z-moves and Gen VIII max moves; both of these are never-miss moves that override existing moves. For instance, suppose we have the following Lucario:
+
+> ![](images/HOME448.png){width=25%}
+> 
+> - Close Combat
+> 
+> - Meteor Mash
+> 
+> - Bullet Punch
+> 
+> - Swords Dance
+
+Meteor Mash and Bullet Punch are both physical Steel-type moves.
+
+In Gen VII, Meteor Mash and Bullet Punch can be transformed into the Z-move Corkscrew Crash with power 175 and 100, respectively. Both are classified under the physical version of Corkscrew Crash.
+
+In Gen VIII, Meteor Mash and Bullet Punch can be transformed into the max move Max Steelspike with power 130 and 90, respectively. Both are classified under Max Steelspike.
+
+Due to the situational nature of Z-moves and max moves, along with their varying power, they will be excluded from the analysis as well. 
+
+  </div>
+</div>
+
+```{r move filtering, include=FALSE}
+moves_all <- moves_all %>% 
+  mutate(
+    Generation = 
+      case_when(
+        Gen == 8 ~ "VIII: Galar and Hisui", 
+        Gen == 7 ~ "VII: Alola", 
+        Gen == 6 ~ "VI: Kalos", 
+        Gen == 5 ~ "V: Unova", 
+        Gen == 4 ~ "IV: Sinnoh", 
+        Gen == 3 ~ "III: Hoenn", 
+        Gen == 2 ~ "II: Johto", 
+        TRUE ~ "I: Kanto"
+      )
+  )
+
+maxes <- grep("^Max", moves_all$Name, value = TRUE)
+moves_all <- moves_all %>% 
+  mutate(
+    Gimmick = 
+      case_when(
+        PP == 1 & Name != "Struggle" & Name != "Sketch" ~ "Z-move",
+        Name %in% maxes ~ "Max move",
+        Power == 5000 ~ "OHKO", 
+        TRUE ~ "None"
+      )
+  )
+moves <- moves_all %>% 
+  filter(Gimmick == "None")
+rm(maxes)
+
+moves_damage <- moves %>% 
+  filter(Category != "Status")
+```
+
+## Measures of Spread
+
+Before jumping into more details, let's take a look at some overall spread metrics so we know what we're looking at. This is done without any grouping; summary statistics by group will be performed later in this chapter.
+
+### Power Spread
+
+```{r overall move power avg/sd}
+moves %>% 
+  summarize(
+    power_average = mean(Power), 
+    power_sd = sd(Power)
+  )
+```
+
+```{r overall move power quartiles}
+quantile(moves$Power)
+```
+
+```{r overall move power histogram}
+ggplot(moves, aes(Power)) + geom_histogram(binwidth = 5) + 
+  labs(
+    y = "Count", 
+    title = "Move Power", 
+    caption = "Binwidth = 5"
+  )
+```
+
+Power is the most spread out of the trio. There are quite a few moves with zero power, notably including all status moves. Power also has the highest maximum of the trio, with Explosion's 250 topping the chart. Setting aside all the moves of zero power, the data is fairly balanced with a few outliers (V-create, Self-Destruct, and the aforementioned Explosion).
+
+### Accuracy Check
+
+```{r overall move accuracy avg/sd}
+moves %>% 
+  summarize(
+    acc_average = mean(Accuracy), 
+    acc_sd = sd(Accuracy)
+  )
+```
+
+```{r overall move accuracy quartiles}
+quantile(moves$Accuracy)
+```
+
+```{r overall move accuracy bar chart}
+ggplot(moves, aes(Accuracy)) + geom_bar() + 
+  labs(
+    y = "Count", 
+    title = "Move Accuracy"
+  )
+```
+
+On average, accuracy appears quite close to 100, meaning moves don't typically miss under normal circumstances. Accuracy also has the smallest standard deviation of the trio. From the bar chart, the data is heavily skewed left.
+
+### Power Points
+
+```{r overall move pp avg/sd}
+moves %>% 
+  summarize(
+    pp_average = mean(PP), 
+    pp_sd = sd(PP)
+  )
+```
+
+```{r overall move pp quartiles}
+quantile(moves$PP)
+```
+
+```{r overall move ppm}
+ggplot(moves, aes(PP)) + geom_histogram(binwidth = 5) + 
+  labs(
+    y = "Count", 
+    title = "Move PP", 
+    caption = "Binwidth = 5; there are two moves of PP 1"
+  )
+```
+
+PP has the smallest range (39) of the trio. The data is skewed slightly right, so there is a propensity for moves to have lower PP.
+
+## Types
+
+A natural way to group moves is by type. We'll do just that now, and then group further by other variables.
+
+Firstly, how many moves are there per type?
+
+```{r moves per type, include=FALSE}
+moves_per_type <- moves %>% 
+  group_by(Type) %>% 
+  summarize(count = n()) 
+```
+
+```{r moves per type display}
+moves_per_type %>% 
+  arrange(desc(count)) %>% 
+  print(n = 18)
+```
+
+Visualized via a barchart:
+
+```{r moves per type bars}
+moves %>% 
+  group_by(Type) %>% 
+  summarize(count = n()) %>% 
+  ggplot() + 
+  aes(reorder(Type, -count), count, fill = Type) + 
+  geom_bar(stat = "identity") + 
+  scale_fill_manual(values = type_colors) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "none"
+  ) + 
+  labs(
+    title = "Moves per Type",
+    x = "Type",
+    y = "Count"
+  )
+```
+
+There are many more Normal-type moves than any other type. Many attacks such as Tackle, Pound, and Scratch are Normal-type moves many Pokemon start with, are of low power, and are inevitably replaced by stronger attacks.
+
+Fairy, the newest typing, has a relatively small number of moves, even with a few moves from earlier generations switching to Fairy (Charm, Moonlight, and Sweet Kiss). Rock, one of the fifteen original types, is the rarest move-wise.
+
+### Type Power
+
+We saw previously that Dragon has the highest average BST. Does this also hold true for Dragon move power? Let us restrict our view to damaging moves only (i.e. we will filter out all status moves).
+
+```{r moves by type setup, include=FALSE}
+moves_dmg_summaries <- moves_damage %>% 
+  group_by(Type) %>% 
+  summarize(
+    count = n(),
+    pwr_avg = mean(Power),
+    acc_avg = mean(Accuracy),
+    pp_avg = mean(PP)
+  )
+```
+
+```{r moves by type power}
+ggplot(
+  moves_dmg_summaries, 
+  aes(reorder(Type, -pwr_avg), pwr_avg, fill = Type)
+) + 
+  geom_bar(stat = "identity") + 
+  scale_fill_manual(values = type_colors) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "none"
+  ) + 
+  labs(
+    title = "Average Power per Type",
+    x = "Type",
+    y = "Average Power"
+  )
+```
+
+Via the visual, the answer is "almost." Dragon comes in second, behind Fire. Let us choose 100 as an arbitrary power cutoff; we can count how many moves there are of each type that are at or above our cutoff.
+
+```{r power at least 100}
+moves %>% 
+  filter(Power >= 100) %>% 
+  group_by(Type) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count)) %>% 
+  head(n = 5)
+```
+
+Fire once again comes out on top; Dragon is only fourth. Interestingly, Normal is second in terms of moves of at least 100 power, but is fourth-lowest in average power. This suggests a large number of Normal-type moves that are low in power.
+
+Let us look at all the types using another type of plot, one that gives us a better idea of distribution within each type.
+
+```{r moves by type power violin}
+ggplot(moves_damage, aes(reorder(Type, -Power, mean), Power, fill = Type)) + 
+  geom_violin() + 
+  scale_fill_manual(
+    values = type_colors
+  ) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "none"
+  ) + 
+  labs(
+    title = "Damaging Move Power per Type, Violins",
+    x = "Type",
+    y = "Power"
+  )
+```
+
+With the exceptions of Dark and Ground, the "violins" in the above plot have bulges near their middles. The Normal-type "violin" has an interesting shape: the noticeable outlier at power 250 (Explosion) stretches it the most, and its base is also among the widest of the "violins."
+
+Let us choose the cutoff point of 50; how many moves of each type are there of at most this power?
+
+```{r Normal moves at most 50}
+moves_damage %>% 
+  filter(Power <= 50) %>% 
+  group_by(Type) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count)) %>% 
+  head(n = 5)
+```
+
+As expected, Normal has the most of these moves, which pulls down its average power.
+
+### Type Accuracy
+
+Let us now turn to accuracy, for which we will reset our scope to include moves of power 0 as well. Average accuracy across all moves is about 97 and has maximum value 101, so we don't expect large outliers. However, some moves have low accuracy (e.g. Dark Void with 50), so we may see some small outliers.
+
+It is important to note that of the 774 moves under consideration, 594 of them (76.7%) have at least 100 accuracy. In this way, we expect both boxplots (medians) and violins to be skewed left. Let us test this hypothesis by drawing boxplots.
+
+```{r moves by type acc boxplots}
+ggplot(moves, aes(reorder(Type, -Accuracy, median), Accuracy, fill = Type)) + 
+  geom_boxplot() + 
+  scale_fill_manual(
+    values = type_colors
+  ) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "none"
+  ) + 
+  labs(
+    title = "Accuracy per Type, Boxplots",
+    x = "Type",
+    y = "Accuracy"
+  )
+```
+
+There are seven types whose boxes are nonexistent and fixed at 100, meaning the middle quartiles are all 100. This also means that any moves with accuracy not equal to 100 are automatically considered outliers. For instance, Megahorn is the Bug move with 85 accuracy and is represented by the lowest dot in the Bug boxplot.
+
+### An Accuracy Aside: Let's Rock
+
+As seen in the boxplots, Rock has the lowest accuracy median, sitting at 95. Let's look into this a bit. Under consideration here is move category; we'll describe this in more detail in a later section.
+
+```{r rock move exploration, include=FALSE}
+Rock_moves <- moves %>% 
+  filter(Type == "Rock")
+```
+
+```{r rock move exploration display}
+Rock_moves
+```
+
+There are twenty Rock moves under consideration. The boxplot tells us that there are Rock moves with 101 accuracy; what moves are those?
+
+```{r rock exploration 2}
+Rock_moves %>% 
+  filter(Accuracy == 101)
+```
+
+All four are status moves, which tend to have high accuracy. This whittles us down to sixteen moves with accuracy at most 100. Which have accuracy exactly 100?
+
+```{r rock exploration 3}
+Rock_moves %>% 
+  filter(Accuracy == 100)
+```
+
+There is a mix here. One is a status move (Tar Shot). Two are special and two are physical. Notably, both physical moves have low power (40 and 50).
+
+Thus, eleven of the twenty moves have accuracy below 100. Let's have a look at those.
+
+```{r rock exploration 4}
+Rock_moves %>% 
+  filter(Accuracy < 100)
+```
+
+All but one are physical, and there is a large range of power (minimum 30, maximum 150). From a battling perspective, Rock has important coverage (against Bug, Fire, Flying, and Ice), but comes with more risk than other types, in that moves like Stone Edge and Head Smash could miss at crucial moments.
+
+### Type PP
+
+The last remaining quantity of our usual trio is PP. The maximum and minimum values for PP are 40 and 1, respectively. Let's take a look per type.
+
+```{r pp per type}
+ggplot(moves, aes(reorder(Type, -PP, median), PP, fill = Type)) + 
+  geom_boxplot() + 
+  scale_fill_manual(
+    values = type_colors
+  ) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "none"
+  ) + 
+  labs(
+    title = "PP per Type, Boxplots",
+    x = "Type",
+    y = "PP"
+  )
+```
+
+We previously determined that moves tend to have lower PP; all median values fall between 10 and 20, and every instance of 40 is an outlier. Let's take a closer look at the uncommon 40 PP moves.
+
+```{r 40 pp moves}
+moves %>% 
+  filter(PP == 40)
+```
+
+We come away with 23 moves total. From the boxplots before, we already know which typings have 40 PP moves; what else can we uncover about them?
+
+```{r 40 pp moves 2}
+moves %>% 
+  filter(PP == 40) %>% 
+  group_by(Category) %>% 
+  summarize(count = n())
+```
+
+Of these 23 moves, 18 are status moves, while only five do damage. Additionally, there are no special 40 PP moves. Considering PP represents the number of times a move can be used, we anticipate these physical moves to have low power.
+
+```{r 40 pp moves 3}
+moves %>% 
+  filter(PP == 40 & Category == "Physical")
+```
+
+Just as expected. Rapid Spin has the highest power among the five, with 50.
+
+### Category
+
+Here is a deeper foray into move category, which is comprised of physical, special, and status. Physical moves are as they sound: the target is hit by objects or the user itself. Flare Blitz and Pyro Ball are examples of physical Fire-type moves.
+
+Note that "physical" and "direct contact" are classified separately. Unsurprisingly, most contact moves are physical, but this is not a requirement; we'll look into this later. Flare Blitz is physical and makes contact, whereas Pyro Ball is physical but does not make contact.
+
+Special moves involve beams, waves, and the like, and typically do not make contact. Flamethrower is a special Fire-type move. We might take a guess that types like Psychic, Fire, and Fairy feature more special moves than physical.
+
+Status moves may do indirect damage in the form of inflicting poison or burn (damage applied at the end of each turn), boost or lower stats (Swords Dance boosts the user's Attack by two stages; Charm lowers the target's Attack by two stages), or any number of other things.
+
+Let's run a quick count.
+
+```{r move category counts}
+moves %>% 
+  group_by(Category) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count))
+```
+
+And now let's break it down by type. These are sorted alphabetically by type.
+
+```{r moves by type and category}
+ggplot(moves, aes(Type, color = Type, fill = Category)) + 
+  geom_bar(width = 0.5, position = "stack") + 
+  scale_fill_manual(
+    values = c(
+      "Physical" = "#C42617", 
+      "Special" = "#52566F", 
+      "Status" = "#8C888C"
+    )
+  ) +
+  scale_color_manual(values = type_colors) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  ) + 
+  guides(color = "none") + 
+  labs(
+    title = "Category Proportions per Type",
+    x = "Type",
+    y = "Proportion",
+    fill = "Category"
+  )
+```
+
+This reinforces that Normal has the most moves, but we see a few other details, some more obvious than others.
+
+* Dragon and Fire have very few status moves, with two each.
+
+* Fairy has very few physical moves, with two.
+
+* Fighting is primarily physical.
+
+* Psychic has the most special moves (24), followed closely by Fire (23).
+
+Why so many physical moves? This may stem from Gen I, when Special Attack and Special Defense were bundled together (into one stat called Special). Additionally, Gen III and earlier classified physical and special moves solely by type: for instance, Fire moves were always special and Poison moves were always physical. For better balance, Gen IV created the physical/special split that is used today, and created moves that gave types a better mix (e.g. physical Fire moves and special Poison moves).
+
+We can normalize bar height as well for a better idea of proportion, at the cost of total move count per type.
+
+```{r moves by type and category normalized}
+ggplot(moves, aes(Type, color = Type, fill = Category)) + 
+  geom_bar(width = 0.65, size = 0.85, position = "fill") + 
+  scale_fill_manual(
+    values = c(
+      "Physical" = "#C42617", 
+      "Special" = "#52566F", 
+      "Status" = "#8C888C"
+    )
+  ) +
+  scale_color_manual(values = type_colors) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  ) + 
+  guides(color = "none") + 
+  labs(
+    title = "Category Proportions per Type",
+    x = "Type",
+    y = "Proportion",
+    fill = "Category"
+  )
+```
+
+### Contact
+
+As the final subsection in our preliminary types exploration, let's take a look at contact moves. Firstly, how many such moves are there?
+
+```{r contact 1}
+moves %>% 
+  filter(Contact == TRUE) %>% 
+  summarize(count = n())
+```
+
+Thus, of the 774 moves under consideration, 31.4% of them make contact.
+
+We saw that Fighting-type moves are primarily physical. This includes such moves as Close Combat, Mach Punch, and High Jump Kick; all these sound like contact moves (and in fact are). We now determine how many contact moves there are per type.
+
+```{r contact per type ratios}
+contact_moves_per_type <- moves %>% 
+  filter(Contact == TRUE) %>% 
+  group_by(Type) %>% 
+  summarize(count_contact = n())
+contact_moves_per_type <- inner_join(
+  moves_per_type,
+  contact_moves_per_type, 
+  by = "Type",
+) %>% 
+  mutate(ratio = round(count_contact / count, 3)) %>% 
+  select(Type, count_contact, count, ratio) %>% 
+  arrange(desc(ratio))
+contact_moves_per_type %>% slice(1:3, 16:18)
+```
+
+<p>
+  <a class="btn btn-primary" 
+  data-toggle="collapse" 
+  href="#contact1" 
+  role="button" 
+  aria-expanded="false"
+  aria-controls="contact1">
+    Expanded View
+  </a>
+</p>
+<div class="collapse" id="contact1">
+  <div class="card card-body">
+
+```{r contact per type ratios full}
+contact_moves_per_type %>% print(n = 18)
+```
+
+  </div>
+</div>
+
+It comes as no surprise to see Fighting at the top. Steel checks in at second and is the only other type besides Fighting with more than 50% of its move making contact.
+
+On the other hand, Psychic has the least contact moves, a fact that is also not terribly surprising. Interestingly, the Fairy type features more contact moves than physical, meaning there must be at least one special Fairy move that makes contact. We'll look into this more in the next chapter.
+
+The Ground type illustrates how "physical" and "contact" are different. Ground has 16 physical moves, which accounts for 59.3% of its moves. But as we can see from above, there are only five Ground-type moves that make contact. Are they all physical?
+
+```{r ground-type check}
+moves %>% 
+  filter(Type == "Ground" & Category == "Physical") %>% 
+  group_by(Contact) %>% 
+  summarize(count = n())
+```
+
+Yes, all contact Ground-type moves are physical; thus, eleven physical Ground-type moves, including the ever-popular Earthquake, do not make contact.
+
+We can visualize these proportions as well, rather than just looking at a table.
+
+```{r moves by type and contact normalized}
+ggplot(moves, aes(Type, color = Type, fill = Contact)) + 
+  geom_bar(width = 0.65, size = 0.85, position = "fill") +
+  scale_color_manual(values = type_colors) + 
+  scale_fill_manual(
+    values = c(
+      "FALSE" = "#433fe7", 
+      "TRUE" = "#fb7639"
+    )
+  ) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  ) + 
+  guides(color = "none") + 
+  labs(
+    title = "Contact Proportions per Type",
+    x = "Type",
+    y = "Proportion",
+    fill = "Contact?"
+  )
+```
+
+## Generations
+
+In this section, we sort moves by another classification: generation. Much like the matching section in our Pokemon discussion, we ultimately want to explore the idea of power creep: are newer moves stronger than older moves? We know a partial answer (of yes) by way of Z-moves and Max moves, but we are chiefly interested in regular moves.
+
+### Counts
+
+Let's run some simple counts first. Since we've already sorted Pokemon by generation, we'll keep those counts as well.
+
+```{r moves by gen, include=FALSE}
+moves_by_gen <- moves %>% 
+  group_by(Generation) %>% 
+  summarize(move_count = n())
+PKMN_and_moves_by_gen <- inner_join(
+  PKMN_by_gen, 
+  moves_by_gen, 
+  by = "Generation"
+) %>% 
+  select(
+    Generation, 
+    Pokemon_count = count, 
+    move_count
+  )
+```
+
+```{r moves by gen display}
+PKMN_and_moves_by_gen
+```
+
+Gen I introduced the most moves, which isn't too surprising, given that Gen I started the franchise. On the other hand, Gen V introduced the most Pokemon but sits in the middle for moves introduced.
+
+We can also look at generation and categories.
+
+```{r move category by gen}
+ggplot(
+  moves,
+  aes(Generation, fill = Category)
+) + 
+  geom_bar(position = "dodge") + 
+  scale_fill_manual(
+    values = c(
+      "Physical" = "#C42617", 
+      "Special" = "#52566F", 
+      "Status" = "#8C888C"
+    )
+  ) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  ) + 
+  labs(
+    title = "Category per Generation", 
+    y = "Count"
+  )
+```
+
+```{r move category by gen normalized}
+ggplot(
+  moves,
+  aes(Generation, fill = Category)
+) + 
+  geom_bar(position = "fill") + 
+  scale_fill_manual(
+    values = c(
+      "Physical" = "#C42617", 
+      "Special" = "#52566F", 
+      "Status" = "#8C888C"
+    )
+  ) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  ) + 
+  labs(
+    title = "Category per Generation, Normalized", 
+    y = "Proportion"
+  )
+```
+
+Gens I, IV, VII, and VIII all introduced more physical moves than special or status. Gen V is the only generation to introduce more special moves than physical or status.
+
+### Power (Creep)
+
+Due to having removed Z-moves and Max moves, we anticipate power creep to have less of an impact here compared to the Pokemon themselves. Nonetheless, we'll take a gander. For move power, we restrict to damaging moves only.
+
+```{r move power creep 1}
+ggplot(moves_damage, aes(Generation, Power)) + 
+  geom_violin() + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1),
+    legend.position = "none"
+  ) + 
+  labs(
+    title = "Damaging Move Power per Generation, Violins"
+  )
+```
+
+```{r move power creep 2}
+ggplot(moves_damage, aes(Generation, Power)) + 
+  geom_boxplot() + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  ) + 
+  labs(
+    x = "Generation", 
+    title = "Damaging Move Power by Generation, Boxplots"
+  )
+```
+
+Mean and median power have trended upward in later generations, especially during Gens VI and VII, but took a slight downturn in Gen VIII. Later generations have also had power clustered nearer to the middle. Thus, even without Z-moves and Max moves, we see that moves have experienced a small amount of power creep. We claim "small" because moves from Gen I (such as Flamethrower, Ice Beam, Earthquake, and Psychic) are still in wide circulation.
+
+### Accuracy and PP
+
+We wish to group accuracy and PP by generation; for these, we do not expect any strong trends in the same way as power. Let us test that theory on all moves (non-damaging included).
+
+```{r accuracy by gen}
+ggplot(moves, aes(Generation, Accuracy)) + 
+  geom_boxplot() + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  ) + 
+  labs(
+    x = "Generation", 
+    title = "Move Accuracy by Generation, Boxplots"
+  )
+```
+
+Gens I and VIII have boxes that descend below 100, but all eight generations have median accuracy 100. 
+
+```{r pp by gen}
+ggplot(moves, aes(Generation, PP)) + 
+  geom_boxplot() + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  ) + 
+  labs(
+    x = "Generation", 
+    title = "Move PP by Generation, Boxplots"
+  )
+```
+
+Contrary to what we expected (no relationship), PP appears to be decreasing over time, in particular Gen VIII. We can look at the average values per gen as well.
+
+```{r pp per gen 2}
+moves %>% 
+  group_by(Generation) %>% 
+  summarize(PP_avg = mean(PP))
+```
+
+In general, PP is trending downward. For average as well, Gen VIII is lower than all the other generations. This is not from a lack of moves either; we saw previously that Gen VIII introduced more moves than both Gen VI and Gen VII.
+
+---
+
+# Additional Questions
+
+In this final chapter, we consider a number of extra questions.
+
+## The Wildest Stat Distribution
+
+### Shuckle
+
+Gen II introduced Shuckle, the Mold Pokemon. Let's take a look at its stats.
+
+> ![](images/HOME213.png){width=20%} 20 / 10 / 230 / 10 / 230 / 5 | 505
+
+Its BST makes it fairly decent, but Shuckle is a great example of how deceiving BST can be. Shuckle's offensive stats are pitiful. How pitiful?
+
+```{r shuckle 1}
+Pokemon %>% 
+  arrange(Atk) %>% 
+  select(Name, Atk) %>% 
+  head(n = 5)
+```
+
+We took only five of 1073 Pokemon, and there is Shuckle, tied for third-worst Attack. What about the other stats?
+
+```{r shuckle 2}
+Pokemon %>% 
+  arrange(SpA) %>% 
+  select(Name, SpA) %>% 
+  head(n = 5)
+```
+
+Tied for worst Special Attack.
+
+```{r shuckle 3}
+Pokemon %>% 
+  arrange(Spe) %>% 
+  select(Name, Spe) %>% 
+  head(n = 5)
+```
+
+And tied for worst Speed. In other words, Shuckle will be outspeeding just about nothing, and will hit for just about zero damage. Being from Gen II, Shuckle was introduced in 1999, and it still remains at or near the bottom for all three offensive stats.
+
+A hopeless cause? Not so fast. Its Defense and Special Defense are both monstrous. How good are these?
+
+```{r shuckle 4}
+Pokemon %>% 
+  arrange(desc(Def)) %>% 
+  select(Name, Def) %>% 
+  head(n = 5)
+```
+
+```{r shuckle 5}
+Pokemon %>% 
+  arrange(desc(SpD)) %>% 
+  select(Name, SpD) %>% 
+  head(n = 5)
+```
+
+Shuckle ties two Mega Evolutions for Defense and outpaced *all* other Pokemon in Special Defense. These would be remarkable feats for individual Pokemon, but are indeed done by a single Pokemon.
+
+All totaled, Shuckle has one of the strangest stat lines in the game, if not the strangest. We'd like to look for other stat lines like Shuckle's, and determine if Shuckle has the widest spread across its six stats.
+
+Despite each Pokemon only having six data points, we'll use standard deviation to determine stat spread.
+
+```{r Pokemon sd}
+Pokemon %>% 
+  rowwise() %>% 
+  mutate(
+    SD = round(sd(c(HP, Atk, Def, SpA, SpD, Spe)), 2)
+  ) %>% 
+  select(Name, SD, HP:BST, Generation) %>% 
+  arrange(desc(SD)) %>% 
+  head(n = 10)
+```
+
+A few observations:
+
+* The top of the pile is Shuckle, the only Pokemon with a triple-digit standard deviation for its stats.
+
+* Four of the ten listed are from Gen II (Shuckle, Blissey, Steelix-Mega, and Wobbuffet).
+
+* Two are from Gen VII (Stakataka and Guzzlord). Both of these Pokemon are Ultra Beasts, a class of eleven extradimensional Pokemon from Gen VII. With the exception of Celesteela, these Pokemon tend to have wider stat distributions, and with the exception of Naganadel's Speed (121), all of their base stats are prime numbers.
+
+* One regional variant (Avalugg-Hisui) appears, but not its original form.
+
+* Only one is not fully evolved. This Pokemon is Chansey, which evolves into Blissey.
+
+We could check the other side of the coin, but there are a number of Pokemon that have all their base stats equal to each other, such as Ditto (48), Spinda (60), and Arceus (120). These Pokemon have standard deviation 0 across their stats, making the bottomside of the rankings uninteresting.
+
+## One Type or Two?
+
+Many Pokemon have two types, including a number of box-art legendary Pokemon like Lugia, Kyurem, and Yveltal. The flipside of this is to have a single type, which includes the likes of Kyogre, Arceus, and Xerneas. We wish to compare these two classes of Pokemon by stats. Are the two-typed Pokemon higher in stats?
+
+Firstly, how many monotype Pokemon are there?
+
+```{r monotype count}
+Pokemon %>% 
+  group_by(Monotype) %>% 
+  summarize(count = n())
+```
+
+A perhaps surprisingly even split: 46% have just one type, while 54% have two.
+
+Is there a noticeable difference between their average stats?
+
+```{r monotype averages}
+Pokemon %>% 
+  group_by(Monotype) %>% 
+  summarize(
+      HP_avg = mean(HP),
+      Atk_avg = mean(Atk),
+      Def_avg = mean(Def),
+      SpA_avg = mean(SpA),
+      SpD_avg = mean(SpD),
+      Spe_avg = mean(Spe),
+      BST_avg = mean(BST)
+    )
+```
+
+Right away, we see that all seven quantities are higher for Pokemon of two types. This may be explained by evolutions: some Pokemon begin as monotype but have future stages that gain another type. For instance, Staryu (340 BST) is a Water-type that gains Psychic upon evolution into Starmie (520 BST).
+
+We can also look at monotype versus two-typed Pokemon grouped by type.
+
+```{r monotype by type setup, include=FALSE}
+monotype1 <- list()
+for (i in 1:18) {
+  monotype1[[i]] <- Pokemon_by_type[[i]] %>% 
+    group_by(Monotype) %>% 
+    summarize(
+      HP_avg = mean(HP),
+      Atk_avg = mean(Atk),
+      Def_avg = mean(Def),
+      SpA_avg = mean(SpA),
+      SpD_avg = mean(SpD),
+      Spe_avg = mean(Spe),
+      BST_avg = mean(BST)
+    ) %>% 
+    mutate(
+      Type = types[[i]]
+    ) %>% 
+    select(Type, Monotype, HP_avg:BST_avg)
+}
+monotype1 <- bind_rows(monotype1)
+```
+
+```{r monotype by type}
+ggplot(
+  monotype1, 
+  aes(Type, BST_avg, color = Monotype, fill = Type)
+) + 
+  geom_col(position = "dodge", size = 0.75, width = 0.75) + 
+  scale_fill_manual(values = type_colors) + 
+  guides(
+    fill = "none"
+  ) + 
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)
+  ) + 
+  labs(
+    title = "Average BST per Type",
+    x = "Type",
+    y = "Average BST"
+  )
+```
+
+Some observations:
+
+* Average BST is higher for two-typed Pokemon in all cases except for Normal.
+
+* Bug and Dragon appear to have the largest difference in average BST.
+
+* Dragon has the highest average BST for two-typed Pokemon.
+
+The highest BST average among monotype Pokemon is too close to call from the visual. Let us determine the top three.
+
+```{r monotype by type 2}
+monotype1 %>% 
+  filter(Monotype == TRUE) %>% 
+  slice_max(BST_avg, n = 3) %>% 
+  select(Type, Monotype, BST_avg)
+```
+
+Psychic wins out, barely.
+
+Let's look a bit into Dragon. We already saw that Dragon has the highest overall BST average, and now it also has the highest average BST among two-typed Pokemon. This suggests there aren't very many monotype Dragon Pokemon.
+
+```{r dragon exploration 1}
+Pokemon_by_type[[3]] %>% 
+  group_by(Monotype) %>% 
+  summarize(count = n())
+```
+
+Across the 76 Dragon-type Pokemon, only 17% of them are purely Dragon. Who are these?
+
+```{r dragon exploration 2}
+Pokemon_by_type[[3]] %>% 
+  filter(Monotype == TRUE) %>% 
+  select(Name:Type2, BST) %>% 
+  print(n = 13)
+```
+
+Across these 13 Pokemon, only Haxorus, Druddigon, Goodra, and Regidrago cannot evolve. In other words, the rest are still on the way to their final stages, which will have higher BST.
+
+## Contact and Categories
+
+When we first considered direct contact per type, we saw that there were more contact Fairy moves than physical; thus, at least one special Fairy move makes contact. In this subsection, we want to determine which special moves make contact.
+
+We run a count first.
+
+```{r contact and category 1}
+moves %>% 
+  filter(Contact == TRUE) %>% 
+  group_by(Category) %>% 
+  summarize(count = n())
+```
+
+As we might expect, the vast majority (97.5%) of contact moves are physical. But notably, there are six special contact moves. One of those must be Fairy-type; let's take a look.
+
+```{r contact and category 2}
+moves %>% 
+  filter(Contact == TRUE & Category == "Special") %>% 
+  select(Name, Type, Category, Power, Generation)
+```
+
+Draining Kiss is the Fairy move; we also have two Grass, two Normal, and one Bug move. Three of these moves deal damage but have power listed at 0; these moves have varying damage based on other characteristics (Trump Card on its remaining PP, Wring Out on the target's remaining HP, and Grass Knot on the opponent's weight).
+
+## Gen VIII Move Cuts
+
+Generation VIII features three sets of games: Pokemon Sword/Shield (SwSh), Pokemon Brilliant Diamond/Shining Pearl (BDSP), and Pokemon Legends: Arceus (LA). Each of these games features a radical reduction in both Pokemon and moves from earlier generations. Excluded Pokemon cannot be caught or brought into these games, and excluded moves cannot be selected in battle and must be forgotten.
+
+Our move data contains this information for all three sets of games; in this subsection, we focus on SwSh specifically. Moves that were introduced in LA (which was released after SwSh) are currently not available in SwSh and are considered removed as well.
+
+Let's run a count first.
+
+```{r cuts 1}
+moves_all %>% 
+  group_by(SwSh) %>% 
+  summarize(count = n())
+```
+
+Sword and Shield kept 78.1% of all moves. Is this subset representative of the entire set of moves? We'll use a series of histograms to answer this question.
+
+```{r cuts power histogram 1}
+ggplot(moves, aes(Power)) + geom_histogram(binwidth = 5) + 
+  labs(
+    y = "Count", 
+    title = "Move Power, all moves", 
+    caption = "Binwidth = 5"
+  )
+```
+
+```{r cuts power histogram 2}
+ggplot(filter(moves, SwSh == TRUE), aes(Power)) + 
+  geom_histogram(binwidth = 5) + 
+  labs(
+    y = "Count", 
+    title = "Move Power, SwSh only", 
+    caption = "Binwidth = 5"
+  )
+```
+
+For power, the shape is about the same, just with lower counts.
+
+```{r cuts accuracy bar}
+ggplot(moves, aes(Accuracy)) + geom_bar() + 
+  labs(
+    y = "Count", 
+    title = "Move Accuracy, all moves"
+  )
+```
+
+```{r cuts accuracy bar 2}
+ggplot(filter(moves, SwSh == TRUE), aes(Accuracy)) + geom_bar() + 
+  labs(
+    y = "Count", 
+    title = "Move Accuracy, SwSh only"
+  )
+```
+
+Same result as Power.
+
+```{r cuts pp bar}
+ggplot(moves, aes(PP)) + geom_histogram(binwidth = 5) + 
+  labs(
+    y = "Count", 
+    title = "Move PP, all moves", 
+    caption = "Binwidth = 5; there are two moves of PP 1"
+  )
+```
+
+```{r cuts pp bar 2}
+ggplot(filter(moves, SwSh == TRUE), aes(PP)) + 
+  geom_histogram(binwidth = 5) + 
+  labs(
+    y = "Count", 
+    title = "Move PP, SwSh only", 
+    caption = "Binwidth = 5; there is one move of PP 1"
+  )
+```
+
+And same result as Power and Accuracy. At least from a surface-level look, the subset has similar characteristics to the entire pool of moves.
+
+We can check by type as well: was there a type affected more than the rest?
+
+```{r cuts by type}
+x <- moves_all %>% 
+  group_by(Type) %>% 
+  summarize(count = n())
+y <- moves_all %>% 
+  filter(SwSh == TRUE) %>% 
+  group_by(Type) %>% 
+  summarize(count8 = n())
+moves_Galar_per_type <- inner_join(x, y, by = "Type") %>% 
+  mutate(
+    num_cut = count - count8,
+    ratio_kept = round(count8 / count, 3)) %>% 
+  select(
+    Type, 
+    count_total = count, 
+    count_Galar = count8, 
+    num_cut, 
+    ratio_kept
+  ) %>% 
+  arrange(ratio_kept)
+rm(x, y)
+moves_Galar_per_type %>% slice(1:3, 16:18)
+```
+
+<p>
+  <a class="btn btn-primary" 
+  data-toggle="collapse" 
+  href="#Galarmovesbytype" 
+  role="button" 
+  aria-expanded="false"
+  aria-controls="Galarmovesbytype">
+    Full list
+  </a>
+</p>
+<div class="collapse" id="Galarmovesbytype">
+  <div class="card card-body">
+  
+```{r cuts by type full}
+moves_Galar_per_type %>% print(n = 18)
+```
+
+  </div>
+</div>
+
+By ratio, Bug moves were cut down the most, Fire the least. The interesting one here is Dragon, which lost a total of four moves: three are Z-moves, and the fourth is Dragon Rage, which was the only Dragon move in Gen I.
+
+In line with the structure of this report, we will conclude this subsection with a grouping by generation.
+
+```{r cuts by gen}
+x <- moves_all %>% 
+  group_by(Generation) %>% 
+  summarize(move_count = n())
+y <- moves_all %>% 
+  filter(SwSh == TRUE) %>% 
+  group_by(Generation) %>% 
+  summarize(count8 = n())
+inner_join(x, y, by = "Generation") %>% 
+  mutate(
+    num_cut = move_count - count8,
+    ratio_kept = round(count8 / move_count, 3)) %>% 
+  select(
+    Generation, 
+    count_total = move_count, 
+    count_Galar = count8, 
+    num_cut, 
+    ratio_kept
+  ) 
+rm(x, y)
+```
+
+Gen VIII comes up with the most "removed" moves by ratio, meaning that 27% of its new moves were introduced in Legends: Arceus. Outside of that, Gen VII had the most moves cut: this is in large part due to removing all 53 Z-moves.
+
+---
+
+# To Do
+
+There is more that can be done with this data, without even adding any more data (like move descriptions and added effects). Some future projects could include: 
+
+* Are particular types prone to being larger? We might figure Rock- and Steel-types to be the heaviest; which type is the tallest/longest on average?
+
+* Abilities: are there abilities that always correspond with particular types? What is the most/least common ability?
+
+We could also scrape more data and add to our work, which would provide a better picture.
+
+---
+
+Data courtesy of [Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_by_base_stats_(Generation_VIII-present)) and [The Pokemon Database](pokemondb.net). Images courtesy of Bulbapedia and [Smogon](smogon.com). Pokemon is © 1995 Nintendo.

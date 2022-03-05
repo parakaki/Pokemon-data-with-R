@@ -7,4 +7,4 @@ editor_options:
   chunk_output_type: console
 ---
 
-Describe your project.
+This project aims to be a simple data exploration of Pokemon base stats and moves.
